@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { Lock, LogIn, PieChart, ShieldAlert } from 'lucide-react';
 import api from '../api/client';
 
