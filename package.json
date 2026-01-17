@@ -1,0 +1,13 @@
+{
+    "name": "powerful-private-asset-manager",
+    "version": "1.0.0",
+    "description": "Powerful Private Asset Manager Root Task",
+    "scripts": {
+        "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+        "dev:backend": "mvn spring-boot:run -Dspring-boot.run.profiles=local",
+        "dev:frontend": "npm run dev --prefix frontend"
+    },
+    "devDependencies": {
+        "concurrently": "^9.1.2"
+    }
+}

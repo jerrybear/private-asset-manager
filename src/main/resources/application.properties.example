@@ -1,0 +1,15 @@
+# Database Configuration Example (H2 Memory)
+# spring.datasource.url=jdbc:h2:mem:assetdb
+# spring.datasource.username=sa
+# spring.datasource.password=password
+
+# Database Configuration Example (PostgreSQL)
+# spring.datasource.url=jdbc:postgresql://localhost:5432/assetdb
+# spring.datasource.username=postgres
+# spring.datasource.password=your_password
+
+# Google Sheets Configuration
+# google.sheet.id=YOUR_GOOGLE_SHEET_ID
+
+# Public Data Portal API Configuration
+# public-data.api.key=YOUR_API_KEY
