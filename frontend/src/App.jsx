@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import Overview from './components/Overview';
 import LoginPage from './components/LoginPage';
-import api from './api/client';
+import api, { clearStoredPasscode } from './api/client';
 import './styles/index.css';
 import { LayoutDashboard, PieChart, LogOut } from 'lucide-react';
 
@@ -27,6 +27,7 @@ function App() {
   const handleLogout = async () => {
     try {
       await api.post('/auth/logout');
+      clearStoredPasscode(); // 로그아웃 시 로컬 스토리지 비우기
       setIsAuthenticated(false);
     } catch (err) {
       console.error('Logout failed:', err);

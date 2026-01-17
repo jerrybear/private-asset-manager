@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, LogIn, PieChart, ShieldAlert } from 'lucide-react';
-import api from '../api/client';
+import api, { setStoredPasscode } from '../api/client';
 
 const LoginPage = ({ onLoginSuccess }) => {
     const [passcode, setPasscode] = useState('');
@@ -14,6 +14,7 @@ const LoginPage = ({ onLoginSuccess }) => {
 
         try {
             await api.post('/auth/login', { passcode });
+            setStoredPasscode(passcode); // 통신 성공 시 로컬 스토리지에 저장
             onLoginSuccess();
         } catch (err) {
             if (err.response?.status === 401) {
