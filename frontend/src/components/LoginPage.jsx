@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
 import { Lock, LogIn, PieChart, ShieldAlert } from 'lucide-react';
+import api from '../api/client';
 
 const LoginPage = ({ onLoginSuccess }) => {
     const [passcode, setPasscode] = useState('');
@@ -12,20 +12,14 @@ const LoginPage = ({ onLoginSuccess }) => {
         setError('');
 
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ passcode }),
-                credentials: 'include',
-            });
-
-            if (response.ok) {
-                onLoginSuccess();
-            } else {
-                setError('비밀번호가 올바르지 않습니다.');
-            }
+            await api.post('/auth/login', { passcode });
+            onLoginSuccess();
         } catch (err) {
-            setError('서버와 통신 중 오류가 발생했습니다.');
+            if (err.response?.status === 401) {
+                setError('비밀번호가 올바르지 않습니다.');
+            } else {
+                setError('서버와 통신 중 오류가 발생했습니다.');
+            }
         } finally {
             setLoading(false);
         }

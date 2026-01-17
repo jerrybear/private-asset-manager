@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import Overview from './components/Overview';
 import LoginPage from './components/LoginPage';
+import api from './api/client';
 import './styles/index.css';
 import { LayoutDashboard, PieChart, LogOut } from 'lucide-react';
 
@@ -15,12 +16,8 @@ function App() {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/auth/status`, {
-        headers: { 'Accept': 'application/json' },
-        credentials: 'include',
-      });
-      const data = await response.json();
-      setIsAuthenticated(data.authenticated);
+      const response = await api.get('/auth/status');
+      setIsAuthenticated(response.data.authenticated);
     } catch (err) {
       console.error('Auth check failed:', err);
       setIsAuthenticated(false);
@@ -29,10 +26,7 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      await api.post('/auth/logout');
       setIsAuthenticated(false);
     } catch (err) {
       console.error('Logout failed:', err);
