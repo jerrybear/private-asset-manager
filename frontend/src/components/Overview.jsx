@@ -36,6 +36,11 @@ const Overview = () => {
     // Calculate totals for filtered data
     const totalAssets = filteredSummaries.reduce((sum, s) => sum + (s.totalCurrentValue || 0), 0);
     const totalDividend = filteredSummaries.reduce((sum, s) => sum + (s.totalExpectedDividend || 0), 0);
+    const regularDividend = filteredSummaries
+        .filter(s => s.accountType === 'REGULAR')
+        .reduce((sum, s) => sum + (s.totalExpectedDividend || 0), 0);
+    const otherDividend = totalDividend - regularDividend;
+
     const totalPurchase = filteredSummaries.reduce((sum, s) => sum + (s.totalPurchaseAmount || 0), 0);
     const totalProfitLoss = totalAssets - totalPurchase;
     const totalReturnRate = totalPurchase > 0 ? (totalProfitLoss / totalPurchase) * 100 : 0;
@@ -183,8 +188,15 @@ const Overview = () => {
                     <div style={{ fontSize: '2rem', fontWeight: '900', letterSpacing: '-0.02em' }}>
                         ₩{totalDividend.toLocaleString()}
                     </div>
-                    <div style={{ color: 'var(--text-muted)', marginTop: '12px', fontSize: '1rem', fontWeight: '500' }}>
-                        연 수익률 약 {(totalAssets > 0 ? (totalDividend / totalAssets) * 100 : 0).toFixed(2)}%
+                    <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>일반 계좌 (과세)</span>
+                            <span style={{ fontWeight: '700', color: 'var(--primary)' }}>₩{regularDividend.toLocaleString()}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>기타 계좌 (비과세 등)</span>
+                            <span style={{ fontWeight: '700', color: 'var(--accent)' }}>₩{otherDividend.toLocaleString()}</span>
+                        </div>
                     </div>
                 </div>
 

@@ -212,15 +212,18 @@ public class GoogleSheetsService {
 
         // 5행부터: 자산 데이터
         for (Asset asset : account.getAssets()) {
-            rows.add(createDataRow(Arrays.asList(
-                    asset.getCode(), asset.getName(),
-                    asset.getQuantity() != null ? asset.getQuantity().toString() : "0",
-                    asset.getAveragePurchasePrice() != null ? asset.getAveragePurchasePrice().toString() : "0",
+            List<Object> values = Arrays.asList(
+                    asset.getCode(),
+                    asset.getName(),
+                    asset.getQuantity() != null ? asset.getQuantity() : BigDecimal.ZERO, // Numeric
+                    asset.getAveragePurchasePrice() != null ? asset.getAveragePurchasePrice() : BigDecimal.ZERO, // Numeric
                     asset.getType() != null ? asset.getType().getDescription() : "",
-                    asset.getCurrentPrice() != null ? asset.getCurrentPrice().toString() : "",
+                    asset.getCurrentPrice() != null ? asset.getCurrentPrice() : BigDecimal.ZERO, // Numeric
                     asset.getLastPriceUpdate() != null ? asset.getLastPriceUpdate().format(DATE_TIME_FORMATTER) : "",
                     asset.getDividendCycle() != null ? asset.getDividendCycle() : "없음",
-                    asset.getDividendPerShare() != null ? asset.getDividendPerShare().toString() : "0")));
+                    asset.getDividendPerShare() != null ? asset.getDividendPerShare() : BigDecimal.ZERO // Numeric
+            );
+            rows.add(createMixedDataRow(values, Arrays.asList(2, 3, 5, 8))); // 2,3,5,8번 인덱스는 숫자
         }
 
         List<Request> requests = new ArrayList<>();
@@ -231,13 +234,19 @@ public class GoogleSheetsService {
                 .setRows(rows)
                 .setFields("userEnteredValue,userEnteredFormat")));
 
-        // 열 너비 자동 조정
+        // 열 너비 자동 조정 및 명시적 설정
         requests.add(new Request().setAutoResizeDimensions(new AutoResizeDimensionsRequest()
                 .setDimensions(new DimensionRange()
                         .setSheetId(sheetId)
                         .setDimension("COLUMNS")
                         .setStartIndex(0)
-                        .setEndIndex(9)))); // I열까지 자동 조정 (0-9)
+                        .setEndIndex(10)))); // 전체적으로 자동 조정 시도
+
+        // 특정 열들에 대해 보기 좋은 너비로 명시적 설정 (A=0, B=1, ...)
+        requests.add(createUpdateDimensionWidthRequest(sheetId, 1, 220)); // B: 종목명
+        requests.add(createUpdateDimensionWidthRequest(sheetId, 3, 150)); // D: 금융기관 / 평균단가
+        requests.add(createUpdateDimensionWidthRequest(sheetId, 4, 120)); // E: 유형 / 계좌번호
+        requests.add(createUpdateDimensionWidthRequest(sheetId, 6, 180)); // G: 가격조회일자
 
         // 드롭다운 설정 (유형 열: E열, Index 4)
         ConditionValue[] assetTypeValues = Arrays.stream(AssetType.values())
@@ -316,12 +325,40 @@ public class GoogleSheetsService {
         return new RowData().setValues(cells);
     }
 
+    private RowData createMixedDataRow(List<Object> values, List<Integer> numericIndices) {
+        List<CellData> cells = new ArrayList<>();
+        for (int i = 0; i < values.size(); i++) {
+            Object v = values.get(i);
+            CellData cell = new CellData().setUserEnteredFormat(new CellFormat().setBorders(createThinBorders()));
+
+            if (numericIndices.contains(i) && v instanceof BigDecimal) {
+                cell.setUserEnteredValue(new ExtendedValue().setNumberValue(((BigDecimal) v).doubleValue()));
+                cell.getUserEnteredFormat().setNumberFormat(new NumberFormat().setType("NUMBER").setPattern("#,##0"));
+            } else {
+                cell.setUserEnteredValue(new ExtendedValue().setStringValue(v != null ? v.toString() : ""));
+            }
+            cells.add(cell);
+        }
+        return new RowData().setValues(cells);
+    }
+
     private Borders createThinBorders() {
         Border thinSolid = new Border().setStyle("SOLID")
                 .setColor(new Color().setRed(0.0f).setGreen(0.0f).setBlue(0.0f));
         return new Borders()
                 .setTop(thinSolid).setBottom(thinSolid)
                 .setLeft(thinSolid).setRight(thinSolid);
+    }
+
+    private Request createUpdateDimensionWidthRequest(Integer sheetId, int colIndex, int width) {
+        return new Request().setUpdateDimensionProperties(new UpdateDimensionPropertiesRequest()
+                .setRange(new DimensionRange()
+                        .setSheetId(sheetId)
+                        .setDimension("COLUMNS")
+                        .setStartIndex(colIndex)
+                        .setEndIndex(colIndex + 1))
+                .setProperties(new DimensionProperties().setPixelSize(width))
+                .setFields("pixelSize"));
     }
 
     public List<String> getSheetNames() throws IOException, GeneralSecurityException {
