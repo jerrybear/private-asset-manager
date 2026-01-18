@@ -4,8 +4,11 @@ import com.example.assetmanager.domain.Asset;
 import com.example.assetmanager.domain.AssetType;
 import com.example.assetmanager.domain.Account;
 import com.example.assetmanager.domain.AccountType;
+import com.example.assetmanager.domain.Member;
 import com.example.assetmanager.repository.AssetRepository;
 import com.example.assetmanager.repository.AccountRepository;
+import com.example.assetmanager.repository.MemberRepository;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,8 +28,11 @@ public class AssetService {
 
     private final AccountRepository accountRepository;
     private final AssetRepository assetRepository;
+    private final MemberRepository memberRepository;
     private final List<PriceProvider> priceProviders;
     private final GoogleSheetsService googleSheetsService;
+    private final HttpSession session;
+
     private boolean isInitialSyncing = false;
 
     public boolean isInitialSyncing() {
@@ -37,25 +43,40 @@ public class AssetService {
         isInitialSyncing = initialSyncing;
     }
 
+    private Member getCurrentMember() {
+        Long memberId = (Long) session.getAttribute("memberId");
+        if (memberId == null) {
+            throw new IllegalStateException("Not authenticated");
+        }
+        return memberRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalStateException("Member not found"));
+    }
+
     public List<String> getSheetNames() throws Exception {
-        return googleSheetsService.getSheetNames();
+        Member member = getCurrentMember();
+        return googleSheetsService.getSheetNames(member.getSpreadsheetId());
     }
 
     @Transactional
     public void exportToGoogleSheets(Long accountId) throws Exception {
+        Member member = getCurrentMember();
         Account account = accountRepository.findById(accountId)
-                .orElseThrow(() -> new IllegalArgumentException("Account not found"));
+                .filter(a -> a.getMember().getId().equals(member.getId()))
+                .orElseThrow(() -> new IllegalArgumentException("Account not found or access denied"));
 
-        googleSheetsService.updateSheetWithAccount(account);
+        googleSheetsService.updateSheetWithAccount(member.getSpreadsheetId(), account);
     }
 
     @Transactional
     public void syncWithGoogleSheets(Long accountId) throws Exception {
+        Member member = getCurrentMember();
         Account account = accountRepository.findById(accountId)
-                .orElseThrow(() -> new IllegalArgumentException("Account not found"));
+                .filter(a -> a.getMember().getId().equals(member.getId()))
+                .orElseThrow(() -> new IllegalArgumentException("Account not found or access denied"));
 
         // 시트에서 계좌 정보와 자산 목록을 가져옴
-        Account accountFromSheet = googleSheetsService.fetchAccountFromSheet(account.getSheetName());
+        Account accountFromSheet = googleSheetsService.fetchAccountFromSheet(member.getSpreadsheetId(),
+                account.getSheetName());
 
         // 1. 계좌 메타데이터 업데이트
         if (accountFromSheet.getName() != null && !accountFromSheet.getName().isBlank()) {
@@ -80,18 +101,24 @@ public class AssetService {
     @Transactional
     public Account createAccount(String name, String description, String sheetName, String owner,
             AccountType accountType, String financialInstitution, String accountNumber) {
+        Member member = getCurrentMember();
         if (sheetName != null && !sheetName.isBlank() && accountRepository.existsBySheetName(sheetName)) {
+            // TODO: sheetName 중복 체크를 회원별로 할지, 전체로 할지 검토 필요
+            // 우선은 전체 중복으로 유지하지만, 추후 회원별 중복 체크로 변경 가능
             throw new IllegalArgumentException("이미 등록된 시트 탭입니다: " + sheetName);
         }
         return accountRepository.save(
-                new Account(name, description, sheetName, owner, accountType, financialInstitution, accountNumber));
+                new Account(name, description, sheetName, owner, accountType, financialInstitution, accountNumber,
+                        member));
     }
 
     @Transactional
     public Account updateAccount(Long id, String name, String description, String sheetName, String owner,
             AccountType accountType, String financialInstitution, String accountNumber) {
+        Member member = getCurrentMember();
         Account account = accountRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Account not found"));
+                .filter(a -> a.getMember().getId().equals(member.getId()))
+                .orElseThrow(() -> new IllegalArgumentException("Account not found or access denied"));
 
         if (sheetName != null && !sheetName.isBlank() && !sheetName.equals(account.getSheetName())
                 && accountRepository.existsBySheetName(sheetName)) {
@@ -111,31 +138,44 @@ public class AssetService {
 
     @Transactional(readOnly = true)
     public List<Account> getAllAccounts() {
-        return accountRepository.findAll();
+        Member member = getCurrentMember();
+        return accountRepository.findByMemberId(member.getId());
     }
 
     @Transactional
     public void deleteAccount(Long accountId) {
-        accountRepository.deleteById(accountId);
+        Member member = getCurrentMember();
+        Account account = accountRepository.findById(accountId)
+                .filter(a -> a.getMember().getId().equals(member.getId()))
+                .orElseThrow(() -> new IllegalArgumentException("Account not found or access denied"));
+        accountRepository.delete(account);
     }
 
     @Transactional
     public void deleteAsset(Long assetId) {
-        assetRepository.deleteById(assetId);
+        Member member = getCurrentMember();
+        Asset asset = assetRepository.findById(assetId)
+                .filter(a -> a.getAccount().getMember().getId().equals(member.getId()))
+                .orElseThrow(() -> new IllegalArgumentException("Asset not found or access denied"));
+        assetRepository.delete(asset);
     }
 
     @Transactional
     public Asset addAsset(Long accountId, Asset asset) {
+        Member member = getCurrentMember();
         Account account = accountRepository.findById(accountId)
-                .orElseThrow(() -> new IllegalArgumentException("Account not found"));
+                .filter(a -> a.getMember().getId().equals(member.getId()))
+                .orElseThrow(() -> new IllegalArgumentException("Account not found or access denied"));
         asset.setAccount(account);
         return assetRepository.save(asset);
     }
 
     @Transactional
     public Asset updateAsset(Long assetId, Asset updatedAsset) {
+        Member member = getCurrentMember();
         Asset asset = assetRepository.findById(assetId)
-                .orElseThrow(() -> new IllegalArgumentException("Asset not found"));
+                .filter(a -> a.getAccount().getMember().getId().equals(member.getId()))
+                .orElseThrow(() -> new IllegalArgumentException("Asset not found or access denied"));
 
         if (updatedAsset.getType() != null)
             asset.setType(updatedAsset.getType());
@@ -156,8 +196,10 @@ public class AssetService {
     }
 
     public Map<String, Object> getAccountSummary(Long accountId) {
+        Member member = getCurrentMember();
         Account account = accountRepository.findById(accountId)
-                .orElseThrow(() -> new IllegalArgumentException("Account not found"));
+                .filter(a -> a.getMember().getId().equals(member.getId()))
+                .orElseThrow(() -> new IllegalArgumentException("Account not found or access denied"));
         return calculateAccountSummary(account);
     }
 
@@ -269,7 +311,8 @@ public class AssetService {
     }
 
     public List<Map<String, Object>> getAllAccountSummaries() {
-        List<Account> accounts = accountRepository.findAll();
+        Member member = getCurrentMember();
+        List<Account> accounts = accountRepository.findByMemberId(member.getId());
         return accounts.stream()
                 .map(this::calculateAccountSummary)
                 .toList();
@@ -277,7 +320,12 @@ public class AssetService {
 
     @Transactional
     public void refreshAllPrices(Long accountId, boolean force) {
-        List<Asset> assets = assetRepository.findByAccountId(accountId);
+        Member member = getCurrentMember();
+        Account account = accountRepository.findById(accountId)
+                .filter(a -> a.getMember().getId().equals(member.getId()))
+                .orElseThrow(() -> new IllegalArgumentException("Account not found or access denied"));
+
+        List<Asset> assets = assetRepository.findByAccountId(account.getId());
 
         // PublicDataPriceProvider 식별
         PriceProvider publicDataProvider = priceProviders.stream()
@@ -323,12 +371,14 @@ public class AssetService {
 
     @Transactional
     public BigDecimal refreshAssetPrice(Long accountId, Long assetId, boolean force) {
-        Asset asset = assetRepository.findById(assetId)
-                .orElseThrow(() -> new IllegalArgumentException("Asset not found"));
+        Member member = getCurrentMember();
+        Account account = accountRepository.findById(accountId)
+                .filter(a -> a.getMember().getId().equals(member.getId()))
+                .orElseThrow(() -> new IllegalArgumentException("Account not found or access denied"));
 
-        if (!asset.getAccount().getId().equals(accountId)) {
-            throw new IllegalArgumentException("Asset does not belong to this account");
-        }
+        Asset asset = assetRepository.findById(assetId)
+                .filter(a -> a.getAccount().getId().equals(account.getId()))
+                .orElseThrow(() -> new IllegalArgumentException("Asset not found or access denied"));
 
         // 3시간 이내에 업데이트된 가격이 있다면 재사용 (force=true인 경우 무시)
         java.time.LocalDateTime threeHoursAgo = java.time.LocalDateTime.now().minusHours(3);

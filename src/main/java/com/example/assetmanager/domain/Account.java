@@ -11,6 +11,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Table(name = "accounts")
 public class Account {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,12 +28,16 @@ public class Account {
     private String financialInstitution;
     private String accountNumber;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "member_id")
+    private Member member;
+
     @Builder.Default
     @OneToMany(mappedBy = "account", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Asset> assets = new ArrayList<>();
 
     public Account(String name, String description, String sheetName, String owner, AccountType accountType,
-            String financialInstitution, String accountNumber) {
+            String financialInstitution, String accountNumber, Member member) {
         this.name = name;
         this.description = description;
         this.sheetName = sheetName;
@@ -40,6 +45,7 @@ public class Account {
         this.accountType = accountType;
         this.financialInstitution = financialInstitution;
         this.accountNumber = accountNumber;
+        this.member = member;
         this.assets = new ArrayList<>();
     }
 }

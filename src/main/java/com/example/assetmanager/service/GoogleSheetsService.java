@@ -41,13 +41,10 @@ public class GoogleSheetsService {
         this.sheetsService = sheetsService;
     }
 
-    @Value("${google.sheet.id}")
-    private String spreadsheetId;
-
     /**
      * 시트에서 계좌 정보와 포함된 자산 목록을 가져옵니다.
      */
-    public Account fetchAccountFromSheet(String sheetName)
+    public Account fetchAccountFromSheet(String spreadsheetId, String sheetName)
             throws IOException, GeneralSecurityException {
         Sheets service = getSheetsServiceInstance();
         String targetSheetName = sheetName;
@@ -176,7 +173,7 @@ public class GoogleSheetsService {
     /**
      * 계좌 정보와 자산 목록을 시트에 업데이트합니다.
      */
-    public void updateSheetWithAccount(Account account)
+    public void updateSheetWithAccount(String spreadsheetId, Account account)
             throws IOException, GeneralSecurityException {
         Sheets service = getSheetsServiceInstance();
         String targetSheetName = account.getSheetName();
@@ -324,7 +321,7 @@ public class GoogleSheetsService {
                 .setLeft(thinSolid).setRight(thinSolid);
     }
 
-    public List<String> getSheetNames() throws IOException, GeneralSecurityException {
+    public List<String> getSheetNames(String spreadsheetId) throws IOException, GeneralSecurityException {
         Sheets service = getSheetsServiceInstance();
         com.google.api.services.sheets.v4.model.Spreadsheet spreadsheet = service.spreadsheets().get(spreadsheetId)
                 .execute();

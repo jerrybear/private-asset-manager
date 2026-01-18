@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import Overview from './components/Overview';
 import LoginPage from './components/LoginPage';
-import api, { clearStoredPasscode } from './api/client';
+import api from './api/client';
 import './styles/index.css';
-import { LayoutDashboard, PieChart, LogOut } from 'lucide-react';
+import { LayoutDashboard, PieChart, LogOut, User, UserX } from 'lucide-react';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState(null);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
     checkAuthStatus();
@@ -18,6 +19,12 @@ function App() {
     try {
       const response = await api.get('/auth/status');
       setIsAuthenticated(response.data.authenticated);
+      if (response.data.authenticated) {
+        setUser({
+          loginId: response.data.loginId,
+          spreadsheetId: response.data.spreadsheetId
+        });
+      }
     } catch (err) {
       console.error('Auth check failed:', err);
       setIsAuthenticated(false);
@@ -27,10 +34,24 @@ function App() {
   const handleLogout = async () => {
     try {
       await api.post('/auth/logout');
-      clearStoredPasscode(); // 로그아웃 시 로컬 스토리지 비우기
       setIsAuthenticated(false);
+      setUser(null);
     } catch (err) {
       console.error('Logout failed:', err);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (window.confirm('정말로 탈퇴하시겠습니까? 모든 정보가 삭제됩니다.')) {
+      try {
+        await api.post('/auth/withdraw');
+        setIsAuthenticated(false);
+        setUser(null);
+        alert('탈퇴 처리가 완료되었습니다.');
+      } catch (err) {
+        console.error('Withdraw failed:', err);
+        alert('탈퇴 처리 중 오류가 발생했습니다.');
+      }
     }
   };
 
@@ -43,7 +64,7 @@ function App() {
   }
 
   if (!isAuthenticated) {
-    return <LoginPage onLoginSuccess={() => setIsAuthenticated(true)} />;
+    return <LoginPage onLoginSuccess={checkAuthStatus} />;
   }
 
   return (
@@ -97,20 +118,40 @@ function App() {
           전체 자산 현황
         </button>
 
-        <button
-          onClick={handleLogout}
-          style={{
-            marginLeft: 'auto',
-            display: 'flex', alignItems: 'center', gap: '8px',
-            background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)',
-            color: '#ef4444',
-            fontWeight: '600', cursor: 'pointer', padding: '8px 16px', borderRadius: '8px',
-            transition: 'all 0.2s',
-          }}
-        >
-          <LogOut size={18} />
-          로그아웃
-        </button>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: '500' }}>
+            <User size={16} />
+            {user?.loginId} 님
+          </div>
+
+          <button
+            onClick={handleLogout}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
+              color: 'var(--text)',
+              fontWeight: '600', cursor: 'pointer', padding: '8px 16px', borderRadius: '8px',
+              transition: 'all 0.2s',
+            }}
+          >
+            <LogOut size={16} />
+            로그아웃
+          </button>
+
+          <button
+            onClick={handleWithdraw}
+            title="회원 탈퇴"
+            style={{
+              display: 'flex', alignItems: 'center', justifyCenter: 'center',
+              background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)',
+              color: '#ef4444',
+              cursor: 'pointer', padding: '8px', borderRadius: '8px',
+              transition: 'all 0.2s',
+            }}
+          >
+            <UserX size={16} />
+          </button>
+        </div>
       </nav>
 
       <main style={{ flex: 1 }}>

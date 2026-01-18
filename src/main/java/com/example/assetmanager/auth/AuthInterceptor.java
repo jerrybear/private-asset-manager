@@ -3,15 +3,11 @@ package com.example.assetmanager.auth;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
-
-    @Value("${APP_AUTH_PASSCODE:1234}")
-    private String passcode;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
@@ -21,20 +17,22 @@ public class AuthInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        HttpSession session = request.getSession(false);
-        if (session != null && Boolean.TRUE.equals(session.getAttribute("authenticated"))) {
+        // 로그인/회원가입 API는 통과
+        String path = request.getRequestURI();
+        if (path.startsWith("/api/auth/login") || path.startsWith("/api/auth/signup")
+                || path.startsWith("/api/auth/status")) {
             return true;
         }
 
-        // 헤더 기반 인증 (Vercel <-> Local 등 세션 쿠키가 차단되는 환경용)
-        String authHeader = request.getHeader("X-PAM-Auth");
-        if (passcode.equals(authHeader)) {
+        HttpSession session = request.getSession(false);
+        if (session != null && Boolean.TRUE.equals(session.getAttribute("authenticated"))
+                && session.getAttribute("memberId") != null) {
             return true;
         }
 
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setHeader("Content-Type", "application/json;charset=UTF-8");
         response.getWriter().write("{\"error\": \"Unauthorized - Please login first\"}");
-        response.setContentType("application/json");
         return false;
     }
 }

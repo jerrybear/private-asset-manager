@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { Lock, LogIn, PieChart, ShieldAlert } from 'lucide-react';
-import api, { setStoredPasscode } from '../api/client';
+import { Lock, LogIn, PieChart, ShieldAlert, UserPlus, User, FileJson } from 'lucide-react';
+import api from '../api/client';
 
 const LoginPage = ({ onLoginSuccess }) => {
-    const [passcode, setPasscode] = useState('');
+    const [isSignup, setIsSignup] = useState(false);
+    const [loginId, setLoginId] = useState('');
+    const [password, setPassword] = useState('');
+    const [spreadsheetId, setSpreadsheetId] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -13,12 +16,19 @@ const LoginPage = ({ onLoginSuccess }) => {
         setError('');
 
         try {
-            await api.post('/auth/login', { passcode });
-            setStoredPasscode(passcode); // 통신 성공 시 로컬 스토리지에 저장
+            if (isSignup) {
+                await api.post('/auth/signup', { loginId, password, spreadsheetId });
+                // 자동로그인 처리
+                await api.post('/auth/login', { loginId, password });
+            } else {
+                await api.post('/auth/login', { loginId, password });
+            }
             onLoginSuccess();
         } catch (err) {
             if (err.response?.status === 401) {
-                setError('비밀번호가 올바르지 않습니다.');
+                setError('아이디 또는 비밀번호가 올바르지 않습니다.');
+            } else if (err.response?.data?.error) {
+                setError(err.response.data.error);
             } else {
                 setError('서버와 통신 중 오류가 발생했습니다.');
             }
@@ -39,7 +49,7 @@ const LoginPage = ({ onLoginSuccess }) => {
         }}>
             <div style={{
                 width: '100%',
-                maxWidth: '400px',
+                maxWidth: '440px',
                 backgroundColor: 'rgba(255, 255, 255, 0.03)',
                 backdropFilter: 'blur(16px)',
                 borderRadius: '24px',
@@ -66,11 +76,11 @@ const LoginPage = ({ onLoginSuccess }) => {
                     PAM
                 </h1>
                 <p style={{ color: 'rgba(255, 255, 255, 0.5)', marginBottom: '32px', fontSize: '0.95rem' }}>
-                    자산 관리를 시작하려면 비밀번호를 입력하세요.
+                    {isSignup ? '새로운 계정을 생성하여 자산 관리를 시작하세요.' : '자산 관리를 시작하려면 로그인하세요.'}
                 </p>
 
                 <form onSubmit={handleSubmit}>
-                    <div style={{ marginBottom: '20px', position: 'relative' }}>
+                    <div style={{ marginBottom: '16px', position: 'relative' }}>
                         <div style={{
                             position: 'absolute',
                             left: '16px',
@@ -78,13 +88,13 @@ const LoginPage = ({ onLoginSuccess }) => {
                             transform: 'translateY(-50%)',
                             color: 'rgba(255, 255, 255, 0.4)'
                         }}>
-                            <Lock size={18} />
+                            <User size={18} />
                         </div>
                         <input
-                            type="password"
-                            placeholder="Passcode"
-                            value={passcode}
-                            onChange={(e) => setPasscode(e.target.value)}
+                            type="text"
+                            placeholder="아이디"
+                            value={loginId}
+                            onChange={(e) => setLoginId(e.target.value)}
                             style={{
                                 width: '100%',
                                 padding: '14px 16px 14px 48px',
@@ -96,9 +106,71 @@ const LoginPage = ({ onLoginSuccess }) => {
                                 outline: 'none',
                                 transition: 'all 0.2s',
                             }}
-                            autoFocus
+                            required
                         />
                     </div>
+
+                    <div style={{ marginBottom: isSignup ? '16px' : '24px', position: 'relative' }}>
+                        <div style={{
+                            position: 'absolute',
+                            left: '16px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            color: 'rgba(255, 255, 255, 0.4)'
+                        }}>
+                            <Lock size={18} />
+                        </div>
+                        <input
+                            type="password"
+                            placeholder="비밀번호"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '14px 16px 14px 48px',
+                                borderRadius: '12px',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                color: 'white',
+                                fontSize: '1rem',
+                                outline: 'none',
+                                transition: 'all 0.2s',
+                            }}
+                            required
+                        />
+                    </div>
+
+                    {isSignup && (
+                        <div style={{ marginBottom: '24px', position: 'relative' }}>
+                            <div style={{
+                                position: 'absolute',
+                                left: '16px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                color: 'rgba(255, 255, 255, 0.4)'
+                            }}>
+                                <FileJson size={18} />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="구글 스프레드시트 ID"
+                                value={spreadsheetId}
+                                onChange={(e) => setSpreadsheetId(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '14px 16px 14px 48px',
+                                    borderRadius: '12px',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    color: 'white',
+                                    fontSize: '1rem',
+                                    outline: 'none',
+                                    transition: 'all 0.2s',
+                                }}
+                                required
+                            />
+                        </div>
+                    )}
 
                     {error && (
                         <div style={{
@@ -110,7 +182,7 @@ const LoginPage = ({ onLoginSuccess }) => {
                             marginBottom: '20px',
                             justifyContent: 'center',
                             background: 'rgba(239, 68, 68, 0.1)',
-                            padding: '8px',
+                            padding: '10px',
                             borderRadius: '8px',
                             border: '1px solid rgba(239, 68, 68, 0.2)'
                         }}>
@@ -137,21 +209,34 @@ const LoginPage = ({ onLoginSuccess }) => {
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: '8px',
-                            boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)'
+                            boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)',
+                            marginBottom: '20px'
                         }}
                     >
-                        {loading ? '확인 중...' : (
+                        {loading ? '처리 중...' : (
                             <>
-                                <LogIn size={18} />
-                                입장하기
+                                {isSignup ? <UserPlus size={18} /> : <LogIn size={18} />}
+                                {isSignup ? '가입하기' : '로그인'}
                             </>
                         )}
                     </button>
-                </form>
 
+                    <button
+                        type="button"
+                        onClick={() => setIsSignup(!isSignup)}
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'rgba(255, 255, 255, 0.5)',
+                            fontSize: '0.9rem',
+                            cursor: 'pointer',
+                            textDecoration: 'underline'
+                        }}
+                    >
+                        {isSignup ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
+                    </button>
+                </form>
             </div>
         </div>
     );
 };
-
-export default LoginPage;
